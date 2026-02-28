@@ -143,9 +143,56 @@ export async function getUserName(env, userId) {
         if (data.code === 0 && data.data?.user?.name) {
             return data.data.user.name;
         }
+        // Log failure reason to help diagnose permission issues
+        console.warn(`getUserName failed for ${userId}: code=${data.code} msg=${data.msg}`);
     } catch (e) {
         console.error('Get user name error:', e);
     }
 
     return userId; // fallback to user ID if name lookup fails
+}
+
+/**
+ * Get all members of a chat group (returns list of {open_id, name})
+ * Used to resolve a display name (e.g. "黄林") to an open_id for Bitable filtering
+ * @param {object} env - Environment
+ * @param {string} chatId - Chat group ID
+ * @returns {Array} list of {open_id, name}
+ */
+export async function getChatMembers(env, chatId) {
+    const headers = await getAuthHeaders(env);
+    const members = [];
+    let pageToken = '';
+    let hasMore = true;
+
+    try {
+        while (hasMore) {
+            const params = new URLSearchParams({ member_id_type: 'open_id', page_size: '100' });
+            if (pageToken) params.set('page_token', pageToken);
+
+            const url = `https://open.feishu.cn/open-apis/im/v1/chats/${chatId}/members?${params}`;
+            const resp = await fetch(url, { method: 'GET', headers });
+            const data = await resp.json();
+
+            if (data.code !== 0) {
+                console.warn(`getChatMembers failed: code=${data.code} msg=${data.msg}`);
+                break;
+            }
+
+            for (const item of data.data?.items || []) {
+                // item has: member_id (open_id), name, member_id_type
+                if (item.member_id && item.name) {
+                    members.push({ open_id: item.member_id, name: item.name });
+                }
+            }
+
+            hasMore = data.data?.has_more || false;
+            pageToken = data.data?.page_token || '';
+        }
+    } catch (e) {
+        console.error('getChatMembers error:', e);
+    }
+
+    console.log(`👥 Chat members loaded: ${members.map(m => m.name).join(', ')}`);
+    return members;
 }

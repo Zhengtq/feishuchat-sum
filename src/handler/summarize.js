@@ -4,7 +4,7 @@
  */
 
 import { queryRecords, readConfig } from '../feishu/bitable.js';
-import { sendLoadingCard, sendSummaryCard, sendErrorCard } from '../feishu/message.js';
+import { sendLoadingCard, sendSummaryCard, sendErrorCard, getChatMembers } from '../feishu/message.js';
 import { parseIntent, generateSummary } from '../gemini/client.js';
 
 /**
@@ -50,7 +50,32 @@ export async function handleSummarizeCommand(env, chatId, userText) {
         }
 
         if (intent.sender_filter) {
-            queryOptions.senderFilter = intent.sender_filter;
+            // ── Name → open_id resolution ──────────────────────────────
+            // Bitable stores open_id (e.g. ou_xxxx) in Sender_Name,
+            // so we need to map the display name to open_id first.
+            const members = await getChatMembers(env, chatId);
+            const keyword = intent.sender_filter.toLowerCase();
+            const matched = members.filter(m => m.name.toLowerCase().includes(keyword));
+
+            if (matched.length > 0) {
+                // Matched! Use the open_id(s) for filtering.
+                // If multiple users match (e.g. "林" matches "黄林" and "小林"), include all.
+                const matchedIds = matched.map(m => m.open_id);
+                const matchedNames = matched.map(m => m.name).join('、');
+                console.log(`👤 Resolved "${intent.sender_filter}" → ${matchedNames} (${matchedIds.join(', ')})`);
+                // Use the first matched open_id for now (or union if multiple)
+                queryOptions.senderFilter = matchedIds[0];
+                if (matchedIds.length > 1) {
+                    // Store all IDs for multi-match (queryRecords supports one at a time;
+                    // we simply use the first match — user likely means the most specific)
+                    queryOptions.senderFilter = matchedIds[0];
+                }
+            } else {
+                // No match found in group members — try searching by name directly anyway
+                // (handles case where member list API is unavailable or user left the group)
+                console.warn(`👤 Could not resolve "${intent.sender_filter}" to open_id, filtering by name directly`);
+                queryOptions.senderFilter = intent.sender_filter;
+            }
         }
 
         if (intent.count) {
