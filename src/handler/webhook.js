@@ -71,10 +71,14 @@ export async function handleMessageEvent(env, data) {
         });
 
         console.log(`📋 Summary command detected: "${cleanContent}"`);
-        // Run async (don't block event handler)
-        handleSummarizeCommand(env, chatId, cleanContent).catch((err) =>
-            console.error('Summary error:', err)
-        );
+        // We MUST await here. In Cloudflare Workers/Serverless environments,
+        // hanging promises are killed immediately when the main event handler returns 200 via response,
+        // which causes API calls like getChatMembers or Gemini fetch to silently abort without logs.
+        try {
+            await handleSummarizeCommand(env, chatId, cleanContent);
+        } catch (err) {
+            console.error('Summary error:', err);
+        }
         return;
     }
 
