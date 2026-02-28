@@ -55,24 +55,29 @@ export async function handleSummarizeCommand(env, chatId, userText) {
             // so we need to map the display name to open_id first.
             const members = await getChatMembers(env, chatId);
             const keyword = intent.sender_filter.toLowerCase();
-            const matched = members.filter(m => m.name.toLowerCase().includes(keyword));
+            let matched = members.filter(m => m.name.toLowerCase().includes(keyword));
+
+            if (matched.length === 0) {
+                // Fallback to fuzzy matching (e.g. typing "王林" instead of "黄林")
+                console.log(`👤 Exact match failed for "${intent.sender_filter}", trying fuzzy search...`);
+                matched = members.filter(m => {
+                    const name = m.name.toLowerCase();
+                    const dist = levenshteinDistance(name, keyword);
+                    // Match if distance is 1 (typo of 1 char)
+                    // Or for longer names, distance 2 might be acceptable
+                    return dist <= 1 || (name.length >= 3 && keyword.length >= 3 && dist <= 2);
+                });
+            }
 
             if (matched.length > 0) {
                 // Matched! Use the open_id(s) for filtering.
-                // If multiple users match (e.g. "林" matches "黄林" and "小林"), include all.
                 const matchedIds = matched.map(m => m.open_id);
                 const matchedNames = matched.map(m => m.name).join('、');
                 console.log(`👤 Resolved "${intent.sender_filter}" → ${matchedNames} (${matchedIds.join(', ')})`);
-                // Use the first matched open_id for now (or union if multiple)
+                // Use the first matched open_id (user likely means the most specific match)
                 queryOptions.senderFilter = matchedIds[0];
-                if (matchedIds.length > 1) {
-                    // Store all IDs for multi-match (queryRecords supports one at a time;
-                    // we simply use the first match — user likely means the most specific)
-                    queryOptions.senderFilter = matchedIds[0];
-                }
             } else {
                 // No match found in group members — try searching by name directly anyway
-                // (handles case where member list API is unavailable or user left the group)
                 console.warn(`👤 Could not resolve "${intent.sender_filter}" to open_id, filtering by name directly`);
                 queryOptions.senderFilter = intent.sender_filter;
             }
@@ -127,4 +132,34 @@ function buildSearchDescription(intent) {
         parts.push(`指定时间范围内`);
     }
     return parts.length > 0 ? parts.join('') : '最近 24 小时内';
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy matching sender names (e.g. identifying typos like "王林" instead of "黄林")
+ */
+function levenshteinDistance(a, b) {
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    let matrix = [];
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // substitution
+                    Math.min(matrix[i][j - 1] + 1, // insertion
+                        matrix[i - 1][j] + 1) // deletion
+                );
+            }
+        }
+    }
+    return matrix[b.length][a.length];
 }
