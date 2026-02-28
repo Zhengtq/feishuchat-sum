@@ -10,6 +10,7 @@
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import url from 'url'; // Added missing top-level import for the debug server
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 try {
@@ -94,15 +95,31 @@ cron.schedule('0 16 * * *', async () => {
 });
 console.log('⏰ Cron scheduled: daily cleanup at 00:00 Beijing time');
 
-// ── Health Check HTTP Server (for Render keep-alive) ────────
 const PORT = process.env.PORT || 3000;
-const server = http.createServer((req, res) => {
-    if (req.url === '/health') {
+
+const server = http.createServer(async (req, res) => {
+    const parsedUrl = url.parse(req.url, true);
+
+    if (parsedUrl.pathname === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ status: 'ok', uptime: process.uptime() }));
+    } else if (parsedUrl.pathname === '/debug-members') {
+        const chatId = parsedUrl.query.chatId;
+        if (!chatId) {
+            res.writeHead(400);
+            return res.end('Missing chatId query param');
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        try {
+            const { getChatMembers } = await import('./feishu/message.js');
+            const members = await getChatMembers(env, chatId);
+            res.end(JSON.stringify({ success: true, count: members.length, members }, null, 2));
+        } catch (err) {
+            res.end(JSON.stringify({ error: err.message, stack: err.stack }));
+        }
     } else {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('Feishu Chat Summary Bot is running');
+        res.end('Feishu Chat Summary Bot is running via WebSocket');
     }
 });
 
