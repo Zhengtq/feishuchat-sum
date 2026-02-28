@@ -34,6 +34,7 @@ try {
 import * as lark from '@larksuiteoapi/node-sdk';
 import cron from 'node-cron';
 import http from 'http';
+import https from 'https';
 import { handleMessageEvent } from './handler/webhook.js';
 import { handleCronCleanup } from './handler/cleanup.js';
 
@@ -107,6 +108,22 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
     console.log(`🌐 Health check server listening on port ${PORT}`);
 });
+
+// ── Self Keep-Alive (prevent Render free-tier spin-down) ────
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL;
+if (RENDER_URL) {
+    const KEEP_ALIVE_INTERVAL = 4 * 60 * 1000; // 4 minutes
+    setInterval(() => {
+        https.get(`${RENDER_URL}/health`, (res) => {
+            console.log(`💓 Keep-alive ping: ${res.statusCode}`);
+        }).on('error', (err) => {
+            console.warn('💔 Keep-alive ping failed:', err.message);
+        });
+    }, KEEP_ALIVE_INTERVAL);
+    console.log(`💓 Keep-alive self-ping enabled (every 4 min → ${RENDER_URL}/health)`);
+} else {
+    console.log('ℹ️  Not on Render, skipping keep-alive self-ping');
+}
 
 // ── Graceful Shutdown ───────────────────────────────────────
 process.on('SIGTERM', () => {
