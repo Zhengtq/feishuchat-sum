@@ -49,3 +49,32 @@ export async function getAuthHeaders(env) {
         Authorization: `Bearer ${token}`,
     };
 }
+
+/**
+ * Get bot info to identify if the bot itself is mentioned
+ */
+export async function getBotInfo(env) {
+    if (env._botInfo) return env._botInfo;
+
+    const token = await getTenantToken(env);
+    const url = 'https://open.feishu.cn/open-apis/bot/v3/info';
+
+    try {
+        const resp = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        });
+        const data = await resp.json();
+        if (data.code === 0 && data.bot) {
+            env._botInfo = data.bot; // Contains open_id
+            return data.bot;
+        }
+        console.warn('Failed to get bot info:', data.msg);
+    } catch (e) {
+        console.error('Error fetching bot info:', e);
+    }
+    return null;
+}

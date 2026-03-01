@@ -7,6 +7,7 @@
 import { writeRecord } from '../feishu/bitable.js';
 import { getUserName } from '../feishu/message.js';
 import { handleSummarizeCommand } from './summarize.js';
+import { getBotInfo } from '../feishu/auth.js';
 
 // Deduplication: track processed message IDs
 const processedMessages = new Set();
@@ -61,7 +62,17 @@ export async function handleMessageEvent(env, data) {
 
     // Check if this is a @Bot summary command
     const mentions = message.mentions || [];
-    const isMentioningBot = mentions.some((m) => m.key && content.includes(m.key));
+    let isMentioningBot = false;
+
+    if (mentions.length > 0) {
+        const botInfo = await getBotInfo(env);
+        if (botInfo && botInfo.open_id) {
+            isMentioningBot = mentions.some((m) => m.key && content.includes(m.key) && m.id?.open_id === botInfo.open_id);
+        } else {
+            console.warn('Could not determine bot open_id for mention check, falling back to permissive check');
+            isMentioningBot = mentions.some((m) => m.key && content.includes(m.key));
+        }
+    }
 
     if (isMentioningBot && content.includes('总结')) {
         // Remove @mention tags for cleaner parsing
