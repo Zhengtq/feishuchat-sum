@@ -107,6 +107,39 @@ export async function sendErrorCard(env, chatId, errorMsg) {
 }
 
 /**
+ * Send a news report card
+ */
+export async function sendNewsCard(env, chatId, topic, report) {
+    return sendCard(env, chatId, {
+        header: {
+            title: { tag: 'plain_text', content: `📰 资讯播报：${topic}` },
+            template: 'blue',
+        },
+        elements: [
+            {
+                tag: 'div',
+                text: {
+                    tag: 'lark_md',
+                    content: report,
+                },
+            },
+            {
+                tag: 'hr',
+            },
+            {
+                tag: 'note',
+                elements: [
+                    {
+                        tag: 'plain_text',
+                        content: '🤖 自动全网搜索并总结 by Gemini',
+                    },
+                ],
+            },
+        ],
+    });
+}
+
+/**
  * Internal: Send an interactive card message
  */
 async function sendCard(env, chatId, card) {

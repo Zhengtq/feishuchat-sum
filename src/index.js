@@ -38,6 +38,7 @@ import http from 'http';
 import https from 'https';
 import { handleMessageEvent } from './handler/webhook.js';
 import { handleCronCleanup } from './handler/cleanup.js';
+import { handleCronFeed } from './handler/feed.js';
 
 // ── Environment Variables ───────────────────────────────────
 const APP_ID = process.env.FEISHU_APP_ID;
@@ -55,6 +56,7 @@ const env = {
     FEISHU_BITABLE_APP_TOKEN: process.env.FEISHU_BITABLE_APP_TOKEN,
     FEISHU_BITABLE_TABLE_ID: process.env.FEISHU_BITABLE_TABLE_ID,
     FEISHU_BITABLE_CONFIG_TABLE_ID: process.env.FEISHU_BITABLE_CONFIG_TABLE_ID,
+    FEISHU_BITABLE_FEED_TABLE_ID: process.env.FEISHU_BITABLE_FEED_TABLE_ID,
     FEISHU_VERIFICATION_TOKEN: process.env.FEISHU_VERIFICATION_TOKEN,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     _tokenCache: { token: null, expiry: 0 },
@@ -94,6 +96,12 @@ cron.schedule('0 16 * * *', async () => {
     await handleCronCleanup(env);
 });
 console.log('⏰ Cron scheduled: daily cleanup at 00:00 Beijing time');
+
+// ── Cron: Minute-by-minute Feed check ───────────────────────
+cron.schedule('* * * * *', async () => {
+    await handleCronFeed(env);
+});
+console.log('⏰ Cron scheduled: minute-by-minute feed check');
 
 const PORT = process.env.PORT || 3000;
 

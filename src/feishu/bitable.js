@@ -216,3 +216,47 @@ export async function readConfig(env) {
     }
 }
 
+/**
+ * Read active feeds from the Feed_Config table
+ * Columns: Topic, Schedule_Time, Target_Chat_ID, Is_Active
+ * @returns {Array} Array of active feed objects
+ */
+export async function readFeedsConfig(env) {
+    const { FEISHU_BITABLE_APP_TOKEN, FEISHU_BITABLE_FEED_TABLE_ID } = env;
+
+    if (!FEISHU_BITABLE_FEED_TABLE_ID) {
+        console.warn('⚠️ No feed config table ID (FEISHU_BITABLE_FEED_TABLE_ID) defined in env');
+        return [];
+    }
+
+    try {
+        const headers = await getAuthHeaders(env);
+        // Only query records where Is_Active is true
+        const params = new URLSearchParams({
+            page_size: '100',
+            filter: 'CurrentValue.[Is_Active]=true'
+        });
+        const url = `${BASE_URL}/${FEISHU_BITABLE_APP_TOKEN}/tables/${FEISHU_BITABLE_FEED_TABLE_ID}/records?${params}`;
+        const resp = await fetch(url, { method: 'GET', headers });
+        const data = await resp.json();
+
+        if (data.code !== 0 || !data.data?.items?.length) {
+            console.log('ℹ️ No active feeds found or read failed', data.msg);
+            return [];
+        }
+
+        return data.data.items.map(item => {
+            const f = item.fields;
+            return {
+                recordId: item.record_id,
+                topic: f.Topic?.toString().trim() || '',
+                scheduleTime: f.Schedule_Time?.toString().trim() || '',
+                targetChatId: f.Target_Chat_ID?.toString().trim() || '',
+            };
+        }).filter(f => f.topic && f.scheduleTime && f.targetChatId);
+    } catch (err) {
+        console.error('❌ readFeedsConfig error:', err);
+        return [];
+    }
+}
+

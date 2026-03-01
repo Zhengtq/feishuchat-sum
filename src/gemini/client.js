@@ -165,3 +165,39 @@ export async function generateSummary(env, records, config = {}) {
 
     return data.candidates[0].content.parts[0].text.trim();
 }
+
+/**
+ * Generate a news report using Gemini's Google Search Grounding
+ * @param {object} env - Environment
+ * @param {string} topic - The topic to search for
+ * @param {object} config - Hot config from Bot_Config table
+ * @returns {string} Markdown-formatted report
+ */
+export async function generateNewsReport(env, topic, config = {}) {
+    const model = config.summary_model || 'gemini-2.0-flash';
+    const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
+
+    const prompt = `请搜索关于【${topic}】今天的最新资讯，并总结为一篇约 500 字的简短早报/晚报。\n\n遵守排版规范：1. 绝对禁止使用 "#" 作为标题，请使用加粗（如 **新闻摘要**）。2. 绝对禁止使用斜体。3. 必须在底部或文中带上搜索到的新闻引用链接，以备查验。`;
+
+    const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            tools: [{ googleSearch: {} }], // Enable Search Grounding
+            generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 2048,
+            },
+        }),
+    });
+
+    const data = await resp.json();
+
+    if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error('Gemini search response error:', JSON.stringify(data));
+        throw new Error('Gemini API 搜索异常，请稍后重试');
+    }
+
+    return data.candidates[0].content.parts[0].text.trim();
+}
