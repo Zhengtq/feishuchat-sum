@@ -45,13 +45,13 @@ export async function handleCronFeed(env) {
     // 4. Process each due feed
     for (const feed of dueFeeds) {
         try {
-            console.log(`📰 Generating report for topic: ${feed.topic}`);
-            const report = await generateNewsReport(env, feed.topic);
+            console.log(`📰 Generating report with prompt: ${feed.newsPrompt.substring(0, 30)}...`);
+            const report = await generateNewsReport(env, feed.newsPrompt, feed.model);
             console.log(`📤 Sending report to chat: ${feed.targetChatId}`);
-            await sendNewsCard(env, feed.targetChatId, feed.topic, report);
-            console.log(`✅ Successfully pushed feed: ${feed.topic}`);
+            await sendNewsCard(env, feed.targetChatId, "专属资讯早报", report);
+            console.log(`✅ Successfully pushed feed to: ${feed.targetChatId}`);
         } catch (err) {
-            console.error(`❌ Failed to push feed [${feed.topic}]:`, err);
+            console.error(`❌ Failed to push feed [${feed.targetChatId}]:`, err);
         }
     }
 }

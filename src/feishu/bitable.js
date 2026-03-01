@@ -246,15 +246,16 @@ export async function readFeedsConfig(env) {
 
         return data.data.items.map(item => {
             const f = item.fields;
-            console.log(`📰 FEED DEBUG [${f.Topic}]:`, JSON.stringify(f));
+            console.log(`📰 FEED DEBUG [ID:${item.record_id}]:`, JSON.stringify(f));
             return {
                 recordId: item.record_id,
-                topic: f.Topic?.toString().trim() || '',
+                newsPrompt: f.News_Prompt?.toString().trim() || '',
                 scheduleTime: f.Schedule_Time?.toString().trim() || '',
                 targetChatId: f.Target_Chat_ID?.toString().trim() || '',
+                model: f.model?.toString().trim() || '',
                 isActive: !!f.Is_Active // convert truthy values to boolean
             };
-        }).filter(f => f.isActive && f.topic && f.scheduleTime && f.targetChatId);
+        }).filter(f => f.isActive && f.newsPrompt && f.scheduleTime && f.targetChatId);
     } catch (err) {
         console.error('❌ readFeedsConfig error:', err);
         return [];
