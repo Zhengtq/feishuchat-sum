@@ -177,7 +177,17 @@ export async function generateNewsReport(env, topic, config = {}) {
     const model = config.summary_model || 'gemini-2.0-flash';
     const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
 
-    const prompt = `请搜索关于【${topic}】今天的最新资讯，并总结为一篇约 500 字的简短早报/晚报。\n\n遵守排版规范：\n1. 绝对禁止使用 "#" 作为标题，请使用加粗（如 **新闻摘要**）。\n2. 绝对禁止使用斜体和任何HTML标签（如 <br>, <a>, <b> 等）。\n3. 所有的链接和引用，请使用普通文本或标准Markdown格式（[文本](URL)），严禁复杂的嵌套。\n4. 必须在文末带上新闻来源链接。`;
+    const prompt = `你是一个专业的新闻早晚报编辑。请立即使用你的 Google 搜索工具，搜索关于【${topic}】今天的最新资讯。
+
+根据搜索到的真实资讯，直接总结为一篇约 500 字的简短新闻播报。
+
+绝不允许回复“好的，我来为您搜索”类的开场白！必须直接输出最终的新闻内容！
+
+遵守排版规范：
+1. 绝对禁止使用 "#" 作为标题，请使用加粗（如 **新闻摘要**）。
+2. 绝对禁止使用斜体和任何HTML标签（如 <br>, <a>, <b> 等）。
+3. 所有的链接和引用，请使用普通文本或标准Markdown格式（[文本](URL)），严禁复杂的嵌套。
+4. 必须在文末带上新闻来源链接。`;
 
     const resp = await fetch(url, {
         method: 'POST',
