@@ -231,10 +231,9 @@ export async function readFeedsConfig(env) {
 
     try {
         const headers = await getAuthHeaders(env);
-        // Only query records where Is_Active is true
+        // Remove filter expression temporarily to log raw data structure
         const params = new URLSearchParams({
             page_size: '100',
-            filter: 'CurrentValue.[Is_Active]=true'
         });
         const url = `${BASE_URL}/${FEISHU_BITABLE_APP_TOKEN}/tables/${FEISHU_BITABLE_FEED_TABLE_ID}/records?${params}`;
         const resp = await fetch(url, { method: 'GET', headers });
@@ -247,13 +246,15 @@ export async function readFeedsConfig(env) {
 
         return data.data.items.map(item => {
             const f = item.fields;
+            console.log(`📰 FEED DEBUG [${f.Topic}]:`, JSON.stringify(f));
             return {
                 recordId: item.record_id,
                 topic: f.Topic?.toString().trim() || '',
                 scheduleTime: f.Schedule_Time?.toString().trim() || '',
                 targetChatId: f.Target_Chat_ID?.toString().trim() || '',
+                isActive: !!f.Is_Active // convert truthy values to boolean
             };
-        }).filter(f => f.topic && f.scheduleTime && f.targetChatId);
+        }).filter(f => f.isActive && f.topic && f.scheduleTime && f.targetChatId);
     } catch (err) {
         console.error('❌ readFeedsConfig error:', err);
         return [];

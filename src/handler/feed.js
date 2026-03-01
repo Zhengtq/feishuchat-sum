@@ -8,13 +8,28 @@ import { sendNewsCard } from '../feishu/message.js';
  * @param {object} env - Environment
  */
 export async function handleCronFeed(env) {
-    // 1. Get current hour and minute in Beijing time
-    const now = new Date();
-    // Convert local/UTC to Beijing time (+8) mathematically
-    const beijingTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-    const currentHour = beijingTime.getHours().toString().padStart(2, '0');
-    const currentMinute = beijingTime.getMinutes().toString().padStart(2, '0');
-    const currentTimeStr = `${currentHour}:${currentMinute}`;
+    // Convert local/UTC to Beijing timezone robustly and extract 24-hr parts
+    const cNow = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Shanghai',
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    // Format is "HH:mm" directly when hour12 is false
+    const beijingTimeString = formatter.format(cNow);
+
+    // We expect "HH:mm" from format, but to be sure, let's process it carefully
+    let currentHour, currentMinute;
+    if (beijingTimeString.includes(':')) {
+        [currentHour, currentMinute] = beijingTimeString.split(':');
+    } else {
+        // Fallback or handle odd formatting
+        currentHour = cNow.getHours().toString().padStart(2, '0');
+        currentMinute = cNow.getMinutes().toString().padStart(2, '0');
+    }
+    const currentTimeStr = `${currentHour.padStart(2, '0')}:${currentMinute.padStart(2, '0')}`;
+    console.log(`⏰ Checking Bitable Feeds... Current Beijing Time: ${currentTimeStr}`);
 
     // 2. Read feeds from Bitable
     const feeds = await readFeedsConfig(env);
