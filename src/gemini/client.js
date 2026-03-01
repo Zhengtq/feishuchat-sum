@@ -177,7 +177,7 @@ export async function generateNewsReport(env, topic, config = {}) {
     const model = config.summary_model || 'gemini-2.0-flash';
     const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${env.GEMINI_API_KEY}`;
 
-    const prompt = `请搜索关于【${topic}】今天的最新资讯，并总结为一篇约 500 字的简短早报/晚报。\n\n遵守排版规范：1. 绝对禁止使用 "#" 作为标题，请使用加粗（如 **新闻摘要**）。2. 绝对禁止使用斜体。3. 必须在底部或文中带上搜索到的新闻引用链接，以备查验。`;
+    const prompt = `请搜索关于【${topic}】今天的最新资讯，并总结为一篇约 500 字的简短早报/晚报。\n\n遵守排版规范：\n1. 绝对禁止使用 "#" 作为标题，请使用加粗（如 **新闻摘要**）。\n2. 绝对禁止使用斜体和任何HTML标签（如 <br>, <a>, <b> 等）。\n3. 所有的链接和引用，请使用普通文本或标准Markdown格式（[文本](URL)），严禁复杂的嵌套。\n4. 必须在文末带上新闻来源链接。`;
 
     const resp = await fetch(url, {
         method: 'POST',
@@ -199,5 +199,12 @@ export async function generateNewsReport(env, topic, config = {}) {
         throw new Error('Gemini API 搜索异常，请稍后重试');
     }
 
-    return data.candidates[0].content.parts[0].text.trim();
+    let rawText = data.candidates[0].content.parts[0].text.trim();
+    // Feishu lark_md breaks drastically on HTML or malformed markdown
+    // 1. Remove any stray HTML tags
+    rawText = rawText.replace(/<[^>]*>?/gm, '');
+    // 2. Remove any bolding around links which confuses the parser
+    rawText = rawText.replace(/\*\*\[(.*?)\]\((.*?)\)\*\*/g, '[$1]($2)');
+
+    return rawText;
 }
